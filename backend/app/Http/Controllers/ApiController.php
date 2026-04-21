@@ -6,6 +6,10 @@ use Illuminate\Http\Request;
 use App\Models\Table;
 use App\Models\TableSession;
 use App\Models\Category;
+use App\Models\AppUser;
+use App\Models\UserActivity;
+use App\Models\MenuItem;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ApiController extends Controller
@@ -16,6 +20,8 @@ class ApiController extends Controller
             'qr_token' => 'required|string',
             'device_id' => 'required|string'
         ]);
+
+        AppUser::firstOrCreate(['device_id' => $request->device_id]);
 
         $table = Table::where('qr_token', $request->qr_token)->first();
 
@@ -70,5 +76,48 @@ class ApiController extends Controller
     {
         $categories = Category::with('menuItems')->orderBy('sort_order')->get();
         return response()->json($categories);
+    }
+
+    public function recordActivity(Request $request)
+    {
+        $request->validate([
+            'device_id' => 'required|string',
+            'menu_item_id' => 'required|integer|exists:menu_items,id',
+            'action_type' => 'required|string|in:view,like,cart,order'
+        ]);
+
+        UserActivity::create($request->only('device_id', 'menu_item_id', 'action_type'));
+
+        return response()->json(['status' => 'success']);
+    }
+
+    public function getRecommendations(Request $request)
+    {
+        $request->validate([
+            'device_id' => 'required|string',
+        ]);
+
+        $deviceId = $request->device_id;
+
+        // Simple AI logic: 
+        // 1. Get items the user interacted with (liked, ordered, cart)
+        // 2. Recommend popular items
+        // 3. Just merging for a basic recommendation engine
+
+        // Popular items based on ordering/viewing
+        $popularItems = UserActivity::select('menu_item_id', DB::raw('count(*) as total'))
+            ->groupBy('menu_item_id')
+            ->orderBy('total', 'desc')
+            ->take(5)
+            ->pluck('menu_item_id');
+
+        $recommendations = MenuItem::whereIn('id', $popularItems)->get();
+
+        // If no interactions across the board, just send generic available items
+        if ($recommendations->isEmpty()) {
+            $recommendations = MenuItem::where('is_available', true)->inRandomOrder()->take(5)->get();
+        }
+
+        return response()->json($recommendations);
     }
 }
