@@ -1,78 +1,111 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/session_provider.dart';
 import '../services/api_service.dart';
 
-class OrdersScreen extends ConsumerWidget {
+class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(sessionProvider);
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends ConsumerState<OrdersScreen> {
+  Timer? _timer;
+  List<dynamic> _orders = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrders();
+    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _fetchOrders(isPolling: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchOrders({bool isPolling = false}) async {
+    final session = ref.read(sessionProvider);
     final dio = ref.read(dioProvider);
 
+    try {
+      final response = await dio.get('orders', queryParameters: {'session_code': session.sessionCode});
+      if (mounted) {
+        setState(() {
+          _orders = response.data;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted && !isPolling) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Orders')),
-      body: FutureBuilder(
-        future: dio.get('orders', queryParameters: {'session_code': session.sessionCode}),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final orders = snapshot.data?.data as List? ?? [];
-          if (orders.isEmpty) {
-            return const Center(child: Text('No orders found yet.'));
-          }
-
-          return ListView.builder(
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return Card(
-                margin: const EdgeInsets.all(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Order #${order['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          _buildStatusChip(order['status']),
-                        ],
-                      ),
-                      const Divider(),
-                      ...(order['items'] as List).map((item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      appBar: AppBar(
+        title: const Text('My Orders'),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchOrders),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _orders.isEmpty
+              ? const Center(child: Text('No orders found yet.'))
+              : ListView.builder(
+                  itemCount: _orders.length,
+                  itemBuilder: (context, index) {
+                    final order = _orders[index];
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${item['quantity']}x ${item['menu_item']['name']}'),
-                            Text('\$${item['unit_price']}'),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Order #${order['id']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                _buildStatusChip(order['status']),
+                              ],
+                            ),
+                            const Divider(),
+                            ...(order['items'] as List).map((item) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('${item['quantity']}x ${item['menu_item']['name']}'),
+                                      Text('\$${item['unit_price']}'),
+                                    ],
+                                  ),
+                                )),
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text('\$${order['total_price']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                              ],
+                            ),
                           ],
                         ),
-                      )),
-                      const Divider(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('\$${order['total_price']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
-                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          );
-        },
-      ),
     );
   }
 
