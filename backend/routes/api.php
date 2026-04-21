@@ -10,6 +10,7 @@ Route::post('/activity', [ApiController::class, 'recordActivity']);
 Route::get('/recommendations', [ApiController::class, 'getRecommendations']);
 Route::post('/orders', [ApiController::class, 'submitOrder']);
 Route::get('/orders', [ApiController::class, 'getOrderStatus']);
+Route::post('/sessions/bill', [ApiController::class, 'requestBill']);
 
 // Chef/Kitchen Routes
 use App\Http\Controllers\ChefController;

@@ -106,7 +106,59 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     );
                   },
                 ),
+      bottomNavigationBar: _orders.isEmpty ? null : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          height: 50,
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => _showBillRequestDialog(),
+            child: const Text('Request Bill & Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+        ),
+      ),
     );
+  }
+
+  void _showBillRequestDialog() async {
+    final session = ref.read(sessionProvider);
+    final dio = ref.read(dioProvider);
+
+    try {
+      final response = await dio.post('sessions/bill', data: {'session_code': session.sessionCode});
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Bill Requested'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Total Amount: \$${response.data['total_bill']}'),
+                const SizedBox(height: 8),
+                const Text('A staff member will arrive shortly to process your payment.'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              )
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+       }
+    }
   }
 
   Widget _buildStatusChip(String status) {

@@ -208,4 +208,31 @@ class ApiController extends Controller
 
         return response()->json($orders);
     }
+
+    public function requestBill(Request $request)
+    {
+        $request->validate([
+            'session_code' => 'required|string',
+        ]);
+
+        $session = TableSession::where('session_code', $request->session_code)->where('is_active', true)->first();
+
+        if (!$session) {
+            return response()->json(['error' => 'Invalid or inactive session'], 400);
+        }
+
+        // In a real app, this would notify staff via Pusher/Websockets
+        // For now, we'll mark the session as pending_payment or just close it.
+        // Let's just return the summary for now.
+
+        $totalBill = Order::where('table_session_id', $session->id)
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_price');
+
+        return response()->json([
+            'message' => 'Bill requested. Please wait for a staff member.',
+            'total_bill' => $totalBill,
+            'payment_status' => 'pending'
+        ]);
+    }
 }
