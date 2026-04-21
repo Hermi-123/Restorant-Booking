@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'providers/session_provider.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/cart_screen.dart';
+import 'screens/orders_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: SmartRestaurantApp()));
@@ -43,6 +45,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/menu',
         builder: (context, state) => const MenuScreen(),
+      ),
+      GoRoute(
+        path: '/cart',
+        builder: (context, state) => const CartScreen(),
+      ),
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => const OrdersScreen(),
       ),
     ],
   );

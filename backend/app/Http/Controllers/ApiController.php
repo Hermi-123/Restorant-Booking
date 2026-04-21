@@ -9,6 +9,8 @@ use App\Models\Category;
 use App\Models\AppUser;
 use App\Models\UserActivity;
 use App\Models\MenuItem;
+use App\Models\Order;
+use App\Models\OrderItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -119,5 +121,91 @@ class ApiController extends Controller
         }
 
         return response()->json($recommendations);
+    }
+
+    public function submitOrder(Request $request)
+    {
+        $request->validate([
+            'session_code' => 'required|string',
+            'items' => 'required|array',
+            'items.*.menu_item_id' => 'required|integer|exists:menu_items,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.special_instructions' => 'nullable|string'
+        ]);
+
+        $session = TableSession::where('session_code', $request->session_code)->where('is_active', true)->first();
+
+        if (!$session) {
+            return response()->json(['error' => 'Invalid or inactive session'], 400);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $totalPrice = 0;
+            $orderItemsData = [];
+
+            foreach ($request->items as $itemData) {
+                $menuItem = MenuItem::find($itemData['menu_item_id']);
+                
+                if (!$menuItem->is_available) {
+                    return response()->json(['error' => "Item {$menuItem->name} is not available right now."], 400);
+                }
+
+                $itemTotal = $menuItem->price * $itemData['quantity'];
+                $totalPrice += $itemTotal;
+
+                $orderItemsData[] = [
+                    'menu_item_id' => $menuItem->id,
+                    'quantity' => $itemData['quantity'],
+                    'unit_price' => $menuItem->price,
+                    'special_instructions' => $itemData['special_instructions'] ?? null
+                ];
+            }
+
+            $order = Order::create([
+                'table_session_id' => $session->id,
+                'status' => 'pending',
+                'total_price' => $totalPrice
+            ]);
+
+            foreach ($orderItemsData as $itemData) {
+                $itemData['order_id'] = $order->id;
+                OrderItem::create($itemData);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Order placed successfully',
+                'order_id' => $order->id,
+                'status' => $order->status,
+                'total_price' => $order->total_price
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'An error occurred while placing your order'], 500);
+        }
+    }
+
+    public function getOrderStatus(Request $request)
+    {
+        $request->validate([
+            'session_code' => 'required|string',
+        ]);
+
+        $session = TableSession::where('session_code', $request->session_code)->where('is_active', true)->first();
+
+        if (!$session) {
+            return response()->json(['error' => 'Invalid or inactive session'], 400);
+        }
+
+        $orders = Order::with('items.menuItem')
+            ->where('table_session_id', $session->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($orders);
     }
 }
