@@ -7,14 +7,16 @@ class SessionState {
   final bool isLoading;
   final String? sessionCode;
   final String? tableNumber;
+  final String? deviceId;
 
-  SessionState({this.isLoading = true, this.sessionCode, this.tableNumber});
+  SessionState({this.isLoading = true, this.sessionCode, this.tableNumber, this.deviceId});
 
-  SessionState copyWith({bool? isLoading, String? sessionCode, String? tableNumber}) {
+  SessionState copyWith({bool? isLoading, String? sessionCode, String? tableNumber, String? deviceId}) {
     return SessionState(
       isLoading: isLoading ?? this.isLoading,
       sessionCode: sessionCode ?? this.sessionCode,
       tableNumber: tableNumber ?? this.tableNumber,
+      deviceId: deviceId ?? this.deviceId,
     );
   }
 }
@@ -67,6 +69,7 @@ class SessionNotifier extends Notifier<SessionState> {
            isLoading: false,
            sessionCode: code,
            tableNumber: response.data['table_number'].toString(),
+           deviceId: deviceId,
          );
          return true;
       }

@@ -60,3 +60,19 @@ final menuProvider = FutureProvider<List<Category>>((ref) async {
     throw Exception('Failed to load menu');
   }
 });
+
+final recommendationsProvider = FutureProvider<List<MenuItem>>((ref) async {
+  final dio = ref.read(dioProvider);
+  final session = ref.watch(sessionProvider);
+  
+  if (session.deviceId == null) return [];
+
+  final response = await dio.get('recommendations', queryParameters: {'device_id': session.deviceId});
+  
+  if (response.statusCode == 200) {
+    List data = response.data;
+    return data.map((json) => MenuItem.fromJson(json)).toList();
+  } else {
+    throw Exception('Failed to load recommendations');
+  }
+});

@@ -11,6 +11,7 @@ class MenuScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final menuAsync = ref.watch(menuProvider);
+    final recommendationsAsync = ref.watch(recommendationsProvider);
     final session = ref.watch(sessionProvider);
     final cart = ref.watch(cartProvider);
 
@@ -31,8 +32,69 @@ class MenuScreen extends ConsumerWidget {
           )
         ],
       ),
-      body: menuAsync.when(
-        data: (categories) {
+      body: Column(
+        children: [
+          recommendationsAsync.when(
+            data: (items) {
+              if (items.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text('AI Recommendations For You ✨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.deepOrange)),
+                  ),
+                  SizedBox(
+                    height: 180,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: items.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return Container(
+                          width: 140,
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => ref.read(cartProvider.notifier).addItem(item),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: item.imageUrl != null
+                                        ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                                        : Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, color: Colors.grey)),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text('\$${item.price}', style: const TextStyle(color: Colors.deepOrange)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: menuAsync.when(
+              data: (categories) {
           if (categories.isEmpty) {
             return const Center(child: Text('No menu items available.'));
           }
@@ -88,9 +150,11 @@ class MenuScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Error: $error')),
-      ),
-    );
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(child: Text('Error: $error')),
+          ),
+        ),
+      ],
+    ),
   }
 }
